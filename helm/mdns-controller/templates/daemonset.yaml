@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "mdns-controller.fullname" . }}
+  namespace: {{ include "mdns-controller.namespace" . }}
+  labels:
+    app: {{ include "mdns-controller.fullname" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "mdns-controller.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "mdns-controller.fullname" . }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "mdns-controller.serviceAccountName" . }}
+      hostNetwork: {{ .Values.hostNetwork }}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      containers:
+        - name: mdns-controller
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: MDNS_INTERFACE
+              value: {{ .Values.network.interface | quote }}
+            - name: MDNS_ADDRESS
+              value: {{ .Values.network.address | quote }}
+            - name: MDNS_HOST_SUFFIX
+              value: {{ .Values.ingress.hostSuffix | quote }}
+            - name: MDNS_ENABLED_ANNOTATION
+              value: {{ .Values.ingress.annotationKey | quote }}
+            - name: MDNS_DEFAULT_ENABLED
+              value: {{ ternary "true" "false" .Values.ingress.defaultEnabled | quote }}
+            - name: MDNS_ENABLE_HOST_AVAHI
+              value: {{ ternary "true" "false" .Values.hostAvahi.enabled | quote }}
+            - name: MDNS_ENABLE_BUNDLED_AVAHI
+              value: {{ ternary "true" "false" .Values.bundledAvahi.enabled | quote }}
+            - name: MDNS_EXTRA_EXCLUDE_INTERFACES
+              value: {{ .Values.network.extraExcludeInterfaces | quote }}
+            - name: MDNS_RECONCILE_INTERVAL
+              value: {{ .Values.health.reconcileInterval | quote }}
+            - name: MDNS_STALE_AFTER
+              value: {{ .Values.health.staleAfter | quote }}
+            - name: MDNS_HTTP_ADDR
+              value: {{ printf ":%v" .Values.health.port | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.health.port }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: avahi-runtime
+              mountPath: /run/avahi-daemon
+            - name: dbus-runtime
+              mountPath: /run/dbus
+            {{- if .Values.hostAvahi.enabled }}
+            - name: host-dbus
+              mountPath: /host-run/dbus
+              readOnly: true
+            {{- end }}
+            - name: cache
+              mountPath: /var/cache/avahi-daemon
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+      volumes:
+        - name: avahi-runtime
+          emptyDir: {}
+        - name: dbus-runtime
+          emptyDir: {}
+        {{- if .Values.hostAvahi.enabled }}
+        - name: host-dbus
+          hostPath:
+            path: /run/dbus
+            type: DirectoryOrCreate
+        {{- end }}
+        - name: cache
+          emptyDir: {}

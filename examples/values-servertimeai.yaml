@@ -1,0 +1,22 @@
+namespaceOverride: kube-system
+
+image:
+  repository: registry.local:30500/networking/mdns-controller
+  tag: "0.1.0"
+
+hostAvahi:
+  enabled: true
+
+bundledAvahi:
+  enabled: true
+
+ingress:
+  hostSuffix: .local
+  annotationKey: mdns.shipstuff.io/enabled
+  defaultEnabled: true
+
+network:
+  extraExcludeInterfaces: ""
+
+health:
+  port: 8080

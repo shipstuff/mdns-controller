@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mdns-controller
+description: Node-local ingress mDNS publisher backed by Avahi
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

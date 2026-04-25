@@ -1,0 +1,79 @@
+namespaceOverride: kube-system
+createNamespace: false
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/shipstuff/mdns-controller
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+
+rbac:
+  create: true
+
+podAnnotations: {}
+
+hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
+
+hostAvahi:
+  enabled: true
+
+bundledAvahi:
+  enabled: true
+
+ingress:
+  hostSuffix: .local
+  annotationKey: mdns.shipstuff.io/enabled
+  defaultEnabled: true
+
+network:
+  interface: ""
+  address: ""
+  extraExcludeInterfaces: ""
+
+health:
+  port: 8080
+  reconcileInterval: 15s
+  staleAfter: 60s
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  runAsUser: 0
+  runAsGroup: 0
+  capabilities:
+    add:
+      - CHOWN
+      - NET_ADMIN
+      - NET_RAW
+      - SETPCAP
+      - SETGID
+      - SETUID
+      - SYS_RESOURCE
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+  appArmorProfile:
+    type: Unconfined
+
+tolerations:
+  - operator: Exists
+
+nodeSelector:
+  kubernetes.io/os: linux
+
+extraEnv: []
