@@ -15,6 +15,13 @@ Kubernetes controller that publishes ingress-backed `.local` hostnames through A
 
 ## Install
 
+Use a Kubernetes context permitted to create the chart's ServiceAccount,
+DaemonSet, ClusterRole, and ClusterRoleBinding, and manage Helm release secrets
+in the target namespace. Nodes need a multicast-capable LAN interface and an
+ingress endpoint reachable at the advertised node address. The default chart
+uses host networking, host D-Bus access, and a root container with capabilities;
+namespace admission policies must allow these settings.
+
 From this repo:
 
 ```bash
@@ -26,17 +33,49 @@ From the published OCI chart after a `v*` tag has been pushed and CI has publish
 
 ```bash
 helm upgrade --install mdns-controller oci://ghcr.io/shipstuff/charts/mdns-controller \
-  --version 0.1.0 \
+  --version 0.1.1 \
   --namespace kube-system
 ```
 
 For the servertimeai/home-lab defaults:
 
 ```bash
-helm upgrade --install mdns-controller ./helm/mdns-controller \
+helm upgrade --install mdns-controller oci://ghcr.io/shipstuff/charts/mdns-controller \
+  --version 0.1.1 \
   --namespace kube-system \
   -f examples/values-servertimeai.yaml
 ```
+
+The chart and image are public. If your Helm client reports a GHCR authentication
+error, check for stale registry credentials; authenticated access can use
+`helm registry login ghcr.io` with a token allowed to read the package.
+
+### CI Upgrades
+
+An operator can bootstrap the release and grant a separate deployment identity
+permission to upgrade it. The chart's read-only Ingress RBAC is for the running
+controller, not for Helm or the CI runner. Apply deployment permissions outside
+CI; the runner should not be able to modify its own grants.
+
+Upgrading this chart requires access to Helm release secrets and the existing
+DaemonSet, ServiceAccount, ClusterRole, and ClusterRoleBinding. Named-resource
+permissions can restrict updates, but cannot authorize creation of missing
+resources; rerun operator bootstrap if those resources are deleted. Helm's
+revisioned secret names also mean standard RBAC cannot restrict secret access
+by release label. Choose the release namespace and CI trust boundary accordingly.
+
+### Migrating An Existing Publisher
+
+Use the existing Helm release name and namespace when replacing an in-tree copy
+of this chart. Check `helm list -A` and `kubectl get daemonsets -A` first. Remove
+the old deployment workflow and any separate legacy publisher after confirming
+the new controller is publishing, so both do not advertise the same aliases.
+Do not remove host Avahi: the controller intentionally reuses it. Kubernetes
+NodeLocal DNSCache (`nodelocaldns`) is unrelated and should also remain.
+
+Check rollout with `kubectl -n kube-system rollout status daemonset/mdns-controller`.
+A NotReady node can block full rollout even when the reachable nodes are healthy;
+inspect node readiness and controller logs before diagnosing a chart failure.
 
 ## Configuration
 
@@ -45,7 +84,7 @@ Common chart values:
 | Value | Default | Purpose |
 |---|---|---|
 | `image.repository` | `ghcr.io/shipstuff/mdns-controller` | Controller image repository. |
-| `image.tag` | `0.1.0` | Controller image tag. |
+| `image.tag` | `0.1.1` | Controller image tag. |
 | `namespaceOverride` | `kube-system` | Namespace used by rendered resources. |
 | `hostAvahi.enabled` | `true` | Reuse host Avahi through `/run/dbus` when available. |
 | `bundledAvahi.enabled` | `true` | Start bundled D-Bus and Avahi fallback when needed. |
@@ -93,7 +132,7 @@ The Dockerfile builds the Go controller statically, then packages it with Avahi,
 Release flow matches the `windrose-self-hosted` pattern:
 
 ```bash
-scripts/release.sh 0.1.1
+scripts/release.sh 0.1.2
 git push --follow-tags origin main
 ```
 
@@ -101,4 +140,3 @@ The release script updates the chart version, chart appVersion, and default imag
 
 - `ghcr.io/shipstuff/mdns-controller:X.Y.Z`
 - `oci://ghcr.io/shipstuff/charts/mdns-controller:X.Y.Z`
-
