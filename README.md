@@ -96,6 +96,14 @@ Common chart values:
 | `network.extraExcludeInterfaces` | empty | Extra comma-separated Avahi deny-interface patterns. |
 | `health.reconcileInterval` | `15s` | Kubernetes-to-Avahi reconcile interval. |
 | `health.staleAfter` | `60s` | Readiness staleness threshold after last successful reconcile. |
+| `tolerations` | `[{operator: Exists}]` | Default permits all taints; override to respect custom maintenance taints. |
+
+Cordoning a node does not exclude a DaemonSet. To use a custom `NoSchedule`
+maintenance taint, replace the default blanket toleration with only the taints
+you intend to tolerate (for example, the control-plane `NoSchedule` taint).
+Kubernetes adds standard DaemonSet node-health tolerations automatically. An
+offline node cannot confirm termination of an old publisher even after its pod
+is removed from desired placement.
 
 When `ingress.defaultEnabled=true`, an ingress is included unless it has:
 
